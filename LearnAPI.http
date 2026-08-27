@@ -1,0 +1,35 @@
+@rootURL = http://localhost:5247
+
+GET {{rootURL}}/weatherforecast/
+Accept: application/json
+
+###
+GET {{rootURL}}/api/books
+accept: application/json
+###
+
+GET {{rootURL}}/api/books/2
+Accept: application/json
+
+###
+
+POST {{rootURL}}/api/books
+Content-Type: application/json
+{
+  "id":6,
+  "title": "C# Unlocked",
+  "author": "KF Monkwe",
+  "yearPublished": 2007
+}
+
+###
+PUT {{rootURL}}/api/books/5
+Content-Type: application/json
+{
+  "id":5,
+  "title": "Moby-Dick",
+  "author": "S Lombo",
+  "yearPublished": 2022
+}
+
+
