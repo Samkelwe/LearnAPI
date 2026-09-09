@@ -9,7 +9,22 @@ builder.Services.AddDbContext<BookContext>(options =>
 builder.Services.AddControllers();
 builder.Services.AddOpenApi();
 
+//Allow Front-end to communicate with back
+builder.Services.AddCors(options =>
+{
+    options.AddPolicy("AllowAll", policy =>
+    {
+    policy.AllowAnyOrigin()
+          .AllowAnyMethod()
+           .AllowAnyHeader();
+
+    });
+});
+
+
 var app = builder.Build();
+
+
 
 using (var scope = app.Services.CreateScope())
 {
@@ -22,6 +37,7 @@ if (app.Environment.IsDevelopment())
     app.MapOpenApi();
 }
 
+app.UseCors("AllowAll");
 app.UseHttpsRedirection();
 app.UseAuthorization();
 app.MapControllers();
