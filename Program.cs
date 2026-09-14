@@ -6,7 +6,7 @@ var builder = WebApplication.CreateBuilder(args);
 var connectionString = Environment.GetEnvironmentVariable("DATABASE_URL")
    ?? builder.Configuration.GetConnectionString("DefaultConnection");
 
-if (!string.IsNullOrEmpty(connectionString) && connectionString.StartsWith("postgres://"))
+if (!string.IsNullOrEmpty(connectionString) && connectionString.StartsWith("postgres"))
 {
     var uri = new Uri(connectionString);
     var userInfo = uri.UserInfo.Split(':');
@@ -43,12 +43,12 @@ if (app.Environment.IsDevelopment())
 }
 
 app.UseCors("AllowAll");
-app.UseHttpsRedirection();
+// app.UseHttpsRedirection(); // DISABLED for Railway
 app.UseAuthorization();
 app.MapControllers();
 app.MapGet("/", () => "API is running");
 
 var port = Environment.GetEnvironmentVariable("PORT") ?? "8080";
-app.Urls.Add($"http://+:{port}");
+app.Urls.Add($"http://0.0.0.0:{port}");
 
 app.Run();
