@@ -18,9 +18,19 @@ builder.Services.AddDbContext<BookContext>(options =>
 );
 
 builder.Services.AddControllers();
+builder.Services.AddCors(options =>
+{
+    options.AddPolicy("AllowFrontendApp", policy =>
+    {
+        policy.WithOrigins("https://fame-barbed-plentiful.ngrok-free.dev" ) //change this to specific addresses when deploying to production / live
+              .AllowAnyHeader()
+              .AllowAnyMethod();
+    });
+});
 builder.Services.AddOpenApi();
 
 var app = builder.Build();
+app.UseCors("AllowFrontedApp");
 
 using (var scope = app.Services.CreateScope())
 {
