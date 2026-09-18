@@ -1,7 +1,13 @@
+using NLog;
+using LearnAPI.Contracts;
+using LearnAPI.LoggerService;
 using LearnAPI.Models;
 using Microsoft.EntityFrameworkCore;
+using LearnAPI.Extensions;
+using LearnAPI.Middleware;
 
 var builder = WebApplication.CreateBuilder(args);
+LogManager.Setup().LoadConfigurationFromFile(string.Concat(Directory.GetCurrentDirectory(), "/nlog.config"));
 
 var connectionString = Environment.GetEnvironmentVariable("DATABASE_URL")
    ?? builder.Configuration.GetConnectionString("DefaultConnection");
@@ -18,18 +24,18 @@ builder.Services.AddDbContext<BookContext>(options =>
 );
 
 builder.Services.AddControllers();
-builder.Services.AddCors(options =>
-{
-    options.AddPolicy("AllowAll", policy =>
-    {
-        policy.AllowAnyOrigin()
-              .AllowAnyMethod()
-              .AllowAnyHeader();
-    });
-});
+builder.Services.ConfigureCors();
+builder.Services.ConfigureIISIntegration();
+builder.Services.AddSingleton<ILoggerManager, LoggerManager>();
+
 builder.Services.AddOpenApi();
 
 var app = builder.Build();
+
+var logger = app.Services.GetRequiredService<ILoggerManager>();
+app.ConfigureExceptionHandler(logger);
+
+app.UseCors("CorsPolicy");
 
 using (var scope = app.Services.CreateScope())
 {
