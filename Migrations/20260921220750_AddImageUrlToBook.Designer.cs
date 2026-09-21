@@ -11,7 +11,7 @@ using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 namespace LearnAPI.Migrations
 {
     [DbContext(typeof(BookContext))]
-    [Migration("20260921212411_AddImageUrlToBook")]
+    [Migration("20260921220750_AddImageUrlToBook")]
     partial class AddImageUrlToBook
     {
         /// <inheritdoc />
@@ -34,6 +34,9 @@ namespace LearnAPI.Migrations
 
                     b.Property<string>("Author")
                         .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<string>("ImageUrl")
                         .HasColumnType("text");
 
                     b.Property<string>("Title")
