@@ -32,6 +32,7 @@ builder.Services.AddOpenApi();
 
 var app = builder.Build();
 
+app.UseStaticFiles();
 var logger = app.Services.GetRequiredService<ILoggerManager>();
 app.ConfigureExceptionHandler(logger);
 
