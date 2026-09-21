@@ -27,16 +27,15 @@ builder.Services.AddControllers();
 builder.Services.ConfigureCors();
 builder.Services.ConfigureIISIntegration();
 builder.Services.AddSingleton<ILoggerManager, LoggerManager>();
-
 builder.Services.AddOpenApi();
 
 var app = builder.Build();
 
 app.UseStaticFiles();
+app.UseCors("CorsPolicy");
+
 var logger = app.Services.GetRequiredService<ILoggerManager>();
 app.ConfigureExceptionHandler(logger);
-
-app.UseCors("CorsPolicy");
 
 using (var scope = app.Services.CreateScope())
 {
@@ -49,8 +48,6 @@ if (app.Environment.IsDevelopment())
     app.MapOpenApi();
 }
 
-app.UseCors("AllowAll");
-// app.UseHttpsRedirection(); // DISABLED for Railway
 app.UseAuthorization();
 app.MapControllers();
 app.MapGet("/", () => "API is running");
