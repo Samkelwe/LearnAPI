@@ -1,12 +1,18 @@
+using NLog;
+using LearnAPI.Contracts;
+using LearnAPI.LoggerService;
 using LearnAPI.Models;
 using Microsoft.EntityFrameworkCore;
+using LearnAPI.Extensions;
+using LearnAPI.Middleware;
 
 var builder = WebApplication.CreateBuilder(args);
+LogManager.Setup().LoadConfigurationFromFile(string.Concat(Directory.GetCurrentDirectory(), "/nlog.config"));
 
 var connectionString = Environment.GetEnvironmentVariable("DATABASE_URL")
    ?? builder.Configuration.GetConnectionString("DefaultConnection");
 
-if (!string.IsNullOrEmpty(connectionString) && connectionString.StartsWith("postgres://"))
+if (!string.IsNullOrEmpty(connectionString) && connectionString.StartsWith("postgres"))
 {
     var uri = new Uri(connectionString);
     var userInfo = uri.UserInfo.Split(':');
@@ -18,9 +24,26 @@ builder.Services.AddDbContext<BookContext>(options =>
 );
 
 builder.Services.AddControllers();
+builder.Services.ConfigureCors();
+builder.Services.ConfigureIISIntegration();
+builder.Services.AddSingleton<ILoggerManager, LoggerManager>();
+
+// FIXED SWAGGER
+builder.Services.AddEndpointsApiExplorer();
+builder.Services.AddSwaggerGen();
 builder.Services.AddOpenApi();
 
 var app = builder.Build();
+
+// ENABLE SWAGGER UI
+app.UseSwagger();
+app.UseSwaggerUI();
+
+app.UseStaticFiles();
+app.UseCors("CorsPolicy");
+
+var logger = app.Services.GetRequiredService<ILoggerManager>();
+app.ConfigureExceptionHandler(logger);
 
 using (var scope = app.Services.CreateScope())
 {
@@ -33,12 +56,11 @@ if (app.Environment.IsDevelopment())
     app.MapOpenApi();
 }
 
-app.UseHttpsRedirection();
 app.UseAuthorization();
 app.MapControllers();
 app.MapGet("/", () => "API is running");
 
 var port = Environment.GetEnvironmentVariable("PORT") ?? "8080";
-app.Urls.Add($"http://+:{port}");
+app.Urls.Add($"http://0.0.0.0:{port}");
 
 app.Run();
