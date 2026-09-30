@@ -1,11 +1,13 @@
 ﻿using LearnAPI.Models;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.AspNetCore.Authorization;
 
-namespace FirstAPI.Controllers
+namespace LearnAPI.Controllers
 {
-    [Route("api/[controller]")]
     [ApiController]
+    [Route("api/[controller]")]
+    [Authorize]
     public class BooksController : ControllerBase
     {
         private readonly BookContext _context;
@@ -15,12 +17,14 @@ namespace FirstAPI.Controllers
         }
 
         [HttpGet]
+        [AllowAnonymous] // Anyone can view books
         public async Task<ActionResult<List<Book>>> GetBooks()
         {
             return Ok(await _context.Books.ToListAsync());
         }
 
         [HttpGet("{id}")]
+        [AllowAnonymous] // Anyone can view one book
         public async Task<ActionResult<Book>> GetBookById(int id)
         {
             var book = await _context.Books.FindAsync(id);
@@ -29,7 +33,7 @@ namespace FirstAPI.Controllers
             return Ok(book);
         }
 
-        [HttpPost]
+        [HttpPost] // Only logged in can add
         public async Task<ActionResult<Book>> AddBook(Book newBook)
         {
             if (newBook == null)

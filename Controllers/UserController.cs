@@ -2,7 +2,6 @@ using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using LearnAPI.Models;
 using LearnAPI.DTOs;
-using BCrypt.Net;
 
 namespace LearnAPI.Controllers
 {
@@ -11,26 +10,26 @@ namespace LearnAPI.Controllers
     public class UsersController : ControllerBase
     {
         private readonly BookContext _context;
+        private readonly TokenService _tokenService;
 
-	public UsersController(BookContext context)
+        
+        public UsersController(BookContext context, TokenService tokenService)
         {
             _context = context;
+            _tokenService = tokenService;
         }
 
         // POST: api/users/register
         [HttpPost("register")]
         public async Task<IActionResult> Register(RegisterDto dto)
         {
-            // 1. Check if user exists
             if (await _context.Users.AnyAsync(u => u.Email == dto.Email))
             {
                 return BadRequest("Email already exists");
             }
 
-            // 2. Hash the password
             string passwordHash = BCrypt.Net.BCrypt.HashPassword(dto.Password);
 
-            // 3. Create user
             var user = new User
             {
                 Username = dto.Username,
@@ -44,28 +43,29 @@ namespace LearnAPI.Controllers
             return Ok(new { message = "User registered successfully", user.Id, user.Username, user.Email });
         }
 
-	// POST: api/users/login
-	[HttpPost("login")]
-	public async Task<IActionResult> Login(LoginDto dto)
-	{
-    		// 1. Find user by email
-   		 var user = await _context.Users.FirstOrDefaultAsync(u => u.Email == dto.Email);
-    		if (user == null)
-        	return BadRequest("Invalid email or password");
+        // POST: api/users/login
+        [HttpPost("login")]
+        public async Task<IActionResult> Login(LoginDto dto)
+        {
+            var user = await _context.Users.FirstOrDefaultAsync(u => u.Email == dto.Email);
+            if (user == null)
+                return BadRequest("Invalid email or password");
 
-   		 // 2. Verify the password - THIS IS THE OPPOSITE OF HASHING
-   		 bool isCorrect = BCrypt.Net.BCrypt.Verify(dto.Password, user.PasswordHash);
-    
-    		 if (!isCorrect)
-       		 return BadRequest("Invalid email or password");
+            bool isCorrect = BCrypt.Net.BCrypt.Verify(dto.Password, user.PasswordHash);
+            if (!isCorrect)
+                return BadRequest("Invalid email or password");
 
-    		// 3. Success
-   		 return Ok(new { 
-       		 message = "Login successful", 
-       		 user.Id, 
-        	 user.Username, 
-        	 user.Email 
-   		 });
-	}
+            // Generate token
+            var token = _tokenService.GenerateToken(user);
+
+            return Ok(new
+            {
+                message = "Login successful",
+                token = token,
+                user.Id,
+                user.Username,
+                user.Email
+            });
+        }
     }
 }

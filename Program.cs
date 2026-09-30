@@ -1,10 +1,14 @@
-using NLog;
+using System.Text;
+using Microsoft.AspNetCore.Authentication.JwtBearer;
+using Microsoft.IdentityModel.Tokens;
+using Microsoft.OpenApi.Models;
+using Microsoft.EntityFrameworkCore;
+using LearnAPI.Models;
 using LearnAPI.Contracts;
 using LearnAPI.LoggerService;
-using LearnAPI.Models;
-using Microsoft.EntityFrameworkCore;
 using LearnAPI.Extensions;
 using LearnAPI.Middleware;
+using NLog;
 
 var builder = WebApplication.CreateBuilder(args);
 LogManager.Setup().LoadConfigurationFromFile(string.Concat(Directory.GetCurrentDirectory(), "/nlog.config"));
@@ -30,8 +34,52 @@ builder.Services.AddSingleton<ILoggerManager, LoggerManager>();
 
 // FIXED SWAGGER
 builder.Services.AddEndpointsApiExplorer();
-builder.Services.AddSwaggerGen();
-builder.Services.AddOpenApi();
+builder.Services.AddSwaggerGen(options =>
+{
+    options.AddSecurityDefinition("Bearer", new OpenApiSecurityScheme
+    {
+        Name = "Authorization",
+        Type = SecuritySchemeType.Http,
+        Scheme = "Bearer",
+        BearerFormat = "JWT",
+        In = ParameterLocation.Header,
+        Description = "Enter 'Bearer' [space] and then your valid token. Example: Bearer eyJhbGci..."
+    });
+    options.AddSecurityRequirement(new OpenApiSecurityRequirement
+    {
+        {
+            new OpenApiSecurityScheme
+            {
+                Reference = new OpenApiReference
+                {
+                    Type = ReferenceType.SecurityScheme,
+                    Id = "Bearer"
+                }
+            },
+            new string[] {}
+        }
+    });
+});
+
+
+builder.Services.AddScoped<TokenService>();
+
+builder.Services.AddAuthentication("Bearer")
+    .AddJwtBearer(options => {
+        options.TokenValidationParameters = new TokenValidationParameters
+        {
+            ValidateIssuer = true,
+            ValidateAudience = true,
+            ValidateLifetime = true,
+            ValidateIssuerSigningKey = true,
+            ValidIssuer = builder.Configuration["Jwt:Issuer"],
+            ValidAudience = builder.Configuration["Jwt:Audience"],
+            IssuerSigningKey = new SymmetricSecurityKey(
+                Encoding.UTF8.GetBytes(builder.Configuration["Jwt:Key"]!))
+        };
+    });
+
+builder.Services.AddAuthorization();
 
 var app = builder.Build();
 
@@ -41,6 +89,8 @@ app.UseSwaggerUI();
 
 app.UseStaticFiles();
 app.UseCors("CorsPolicy");
+app.UseAuthentication();
+app.UseAuthorization();
 
 var logger = app.Services.GetRequiredService<ILoggerManager>();
 app.ConfigureExceptionHandler(logger);
@@ -51,10 +101,6 @@ using (var scope = app.Services.CreateScope())
     db.Database.Migrate();
 }
 
-if (app.Environment.IsDevelopment())
-{
-    app.MapOpenApi();
-}
 
 app.UseAuthorization();
 app.MapControllers();
