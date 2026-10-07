@@ -31,8 +31,9 @@ builder.Services.AddControllers();
 builder.Services.ConfigureCors();
 builder.Services.ConfigureIISIntegration();
 builder.Services.AddSingleton<ILoggerManager, LoggerManager>();
+builder.Services.AddHttpContextAccessor(); // <-- NEEDED FOR REFRESH TOKEN IP
+builder.Services.AddScoped<TokenService>();
 
-// FIXED SWAGGER
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen(options =>
 {
@@ -50,19 +51,12 @@ builder.Services.AddSwaggerGen(options =>
         {
             new OpenApiSecurityScheme
             {
-                Reference = new OpenApiReference
-                {
-                    Type = ReferenceType.SecurityScheme,
-                    Id = "Bearer"
-                }
+                Reference = new OpenApiReference { Type = ReferenceType.SecurityScheme, Id = "Bearer" }
             },
             new string[] {}
         }
     });
 });
-
-
-builder.Services.AddScoped<TokenService>();
 
 builder.Services.AddAuthentication("Bearer")
     .AddJwtBearer(options => {
@@ -74,8 +68,7 @@ builder.Services.AddAuthentication("Bearer")
             ValidateIssuerSigningKey = true,
             ValidIssuer = builder.Configuration["Jwt:Issuer"],
             ValidAudience = builder.Configuration["Jwt:Audience"],
-            IssuerSigningKey = new SymmetricSecurityKey(
-                Encoding.UTF8.GetBytes(builder.Configuration["Jwt:Key"]!))
+            IssuerSigningKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(builder.Configuration["Jwt:Key"]!))
         };
     });
 
@@ -83,26 +76,26 @@ builder.Services.AddAuthorization();
 
 var app = builder.Build();
 
-// ENABLE SWAGGER UI
 app.UseSwagger();
 app.UseSwaggerUI();
-
 app.UseStaticFiles();
 app.UseCors("CorsPolicy");
+
 app.UseAuthentication();
 app.UseAuthorization();
 
 var logger = app.Services.GetRequiredService<ILoggerManager>();
 app.ConfigureExceptionHandler(logger);
 
+// THIS MUST CREATE THE TABLE ON RENDER
 using (var scope = app.Services.CreateScope())
 {
     var db = scope.ServiceProvider.GetRequiredService<BookContext>();
+    Console.WriteLine("Running migrations...");
     db.Database.Migrate();
+    Console.WriteLine("Migrations done - RefreshTokens table should now exist");
 }
 
-
-app.UseAuthorization();
 app.MapControllers();
 app.MapGet("/", () => "API is running");
 
