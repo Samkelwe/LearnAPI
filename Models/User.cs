@@ -15,5 +15,7 @@ namespace LearnAPI.Models
 
         [Required]
         public string PasswordHash { get; set; } = string.Empty;
+
+	public List<RefreshToken> RefreshTokens { get; set; } = new();
     }
 }

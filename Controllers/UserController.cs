@@ -2,6 +2,7 @@ using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using LearnAPI.Models;
 using LearnAPI.DTOs;
+using System.Security.Cryptography;
 
 namespace LearnAPI.Controllers
 {
@@ -12,21 +13,17 @@ namespace LearnAPI.Controllers
         private readonly BookContext _context;
         private readonly TokenService _tokenService;
 
-        
         public UsersController(BookContext context, TokenService tokenService)
         {
             _context = context;
             _tokenService = tokenService;
         }
 
-        // POST: api/users/register
         [HttpPost("register")]
         public async Task<IActionResult> Register(RegisterDto dto)
         {
             if (await _context.Users.AnyAsync(u => u.Email == dto.Email))
-            {
                 return BadRequest("Email already exists");
-            }
 
             string passwordHash = BCrypt.Net.BCrypt.HashPassword(dto.Password);
 
@@ -43,11 +40,11 @@ namespace LearnAPI.Controllers
             return Ok(new { message = "User registered successfully", user.Id, user.Username, user.Email });
         }
 
-        // POST: api/users/login
         [HttpPost("login")]
         public async Task<IActionResult> Login(LoginDto dto)
         {
-            var user = await _context.Users.FirstOrDefaultAsync(u => u.Email == dto.Email);
+            var user = await _context.Users.Include(u => u.RefreshTokens)
+                       .FirstOrDefaultAsync(u => u.Email == dto.Email);
             if (user == null)
                 return BadRequest("Invalid email or password");
 
@@ -55,17 +52,60 @@ namespace LearnAPI.Controllers
             if (!isCorrect)
                 return BadRequest("Invalid email or password");
 
-            // Generate token
-            var token = _tokenService.GenerateToken(user);
+            var accessToken = _tokenService.GenerateToken(user);
+            var refreshToken = GenerateRefreshToken();
 
-            return Ok(new
+            refreshToken.UserId = user.Id;
+            _context.RefreshTokens.Add(refreshToken);
+            await _context.SaveChangesAsync();
+
+            return Ok(new TokenResponseDto
             {
-                message = "Login successful",
-                token = token,
-                user.Id,
-                user.Username,
-                user.Email
+                AccessToken = accessToken,
+                RefreshToken = refreshToken.Token,
+                Email = user.Email,
+                Username = user.Username
             });
+        }
+
+        [HttpPost("refresh")]
+        public async Task<IActionResult> Refresh([FromBody] RefreshRequestDto dto)
+        {
+            var refreshToken = await _context.RefreshTokens
+               .Include(r => r.User)
+               .FirstOrDefaultAsync(r => r.Token == dto.RefreshToken);
+
+            if (refreshToken == null || refreshToken.IsRevoked || refreshToken.IsExpired)
+                return Unauthorized("Invalid or expired refresh token");
+
+            // Rotate: revoke old
+            refreshToken.IsRevoked = true;
+
+            // Generate new pair
+            var newAccessToken = _tokenService.GenerateToken(refreshToken.User);
+            var newRefreshToken = GenerateRefreshToken();
+            newRefreshToken.UserId = refreshToken.UserId;
+
+            _context.RefreshTokens.Add(newRefreshToken);
+            await _context.SaveChangesAsync();
+
+            return Ok(new TokenResponseDto
+            {
+                AccessToken = newAccessToken,
+                RefreshToken = newRefreshToken.Token,
+                Email = refreshToken.User.Email,
+                Username = refreshToken.User.Username
+            });
+        }
+
+        private RefreshToken GenerateRefreshToken()
+        {
+            return new RefreshToken
+            {
+                Token = Convert.ToBase64String(RandomNumberGenerator.GetBytes(64)),
+                Expires = DateTime.UtcNow.AddDays(7),
+                Created = DateTime.UtcNow
+            };
         }
     }
 }
