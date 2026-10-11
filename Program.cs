@@ -74,31 +74,45 @@ builder.Services.AddAuthentication("Bearer")
 
 builder.Services.AddAuthorization();
 
+
 var app = builder.Build();
 
+app.ConfigureExceptionHandler();
+
+//Log HTTP requests and responses
+app.UseMiddleware<RequestLoggingMiddleware>();
+
+//Swagger documentation
 app.UseSwagger();
 app.UseSwaggerUI();
+
+//Serve static files
 app.UseStaticFiles();
+
+//Enable CORS
 app.UseCors("CorsPolicy");
 
+// Authenticate users using JWT
 app.UseAuthentication();
+
+//Check whether users are authorized
 app.UseAuthorization();
 
-var logger = app.Services.GetRequiredService<ILoggerManager>();
-app.ConfigureExceptionHandler(logger);
-
-// THIS MUST CREATE THE TABLE ON RENDER
+//Apply database migrations
 using (var scope = app.Services.CreateScope())
 {
     var db = scope.ServiceProvider.GetRequiredService<BookContext>();
+
     Console.WriteLine("Running migrations...");
     db.Database.Migrate();
     Console.WriteLine("Migrations done - RefreshTokens table should now exist");
 }
 
+//Map API endpoints
 app.MapControllers();
 app.MapGet("/", () => "API is running");
 
+// Configure the hosting port
 var port = Environment.GetEnvironmentVariable("PORT") ?? "8080";
 app.Urls.Add($"http://0.0.0.0:{port}");
 
