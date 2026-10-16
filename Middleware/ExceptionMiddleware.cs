@@ -1,6 +1,6 @@
+
 using LearnAPI.Contracts;
-using Microsoft.AspNetCore.Diagnostics;
-using System.Net;
+using Microsoft.AspNetCore.Http;
 
 namespace LearnAPI.Middleware
 {
@@ -9,7 +9,9 @@ namespace LearnAPI.Middleware
         private readonly RequestDelegate _next;
         private readonly ILoggerManager _logger;
 
-        public ExceptionMiddleware(RequestDelegate next, ILoggerManager logger)
+        public ExceptionMiddleware(
+            RequestDelegate next,
+            ILoggerManager logger)
         {
             _next = next;
             _logger = logger;
@@ -23,19 +25,32 @@ namespace LearnAPI.Middleware
             }
             catch (Exception ex)
             {
-                _logger.LogError($"Something went wrong: {ex}");
-                httpContext.Response.StatusCode = (int)HttpStatusCode.InternalServerError;
-                httpContext.Response.ContentType = "application/json";
-                await httpContext.Response.WriteAsync("Internal Server Error.");
+                _logger.LogError(
+                    $"Something went wrong: {ex}");
+
+                if (httpContext.Response.HasStarted)
+                {
+                    throw;
+                }
+
+                httpContext.Response.Clear();
+                httpContext.Response.StatusCode =
+                    StatusCodes.Status500InternalServerError;
+
+                httpContext.Response.ContentType =
+                    "application/json";
+
+                await httpContext.Response.WriteAsJsonAsync(
+                    new { message = "Internal Server Error." });
             }
         }
     }
 
     public static class ExceptionMiddlewareExtensions
     {
-        public static void ConfigureExceptionHandler(this IApplicationBuilder app, ILoggerManager logger)
-        {
-            app.UseMiddleware<ExceptionMiddleware>();
-        }
+        public static IApplicationBuilder ConfigureExceptionHandler(this IApplicationBuilder app)
+	{
+    return app.UseMiddleware<ExceptionMiddleware>();
+	}
     }
 }
